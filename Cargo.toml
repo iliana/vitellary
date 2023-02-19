@@ -1,0 +1,12 @@
+[package]
+name = "vitellary"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = { version = "1.0.69", features = ["backtrace"] }
+argh = "0.1.10"
+read-process-memory = "0.1.5"
+regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
+zerocopy = "0.6.1"
