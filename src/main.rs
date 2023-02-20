@@ -3,10 +3,11 @@
 
 mod game;
 
-use crate::game::{Game, Pid};
+use crate::game::Game;
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use env_logger::Env;
+use read_process_memory::Pid;
 use std::io::BufRead;
 use std::process::Command;
 
