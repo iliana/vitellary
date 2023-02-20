@@ -1,3 +1,4 @@
+mod common;
 mod linux;
 mod macos;
 
@@ -7,10 +8,10 @@ use linux as imp;
 use macos as imp;
 
 use anyhow::Result;
+use debug_ignore::DebugIgnore;
 use read_process_memory::Pid;
 use std::ops::RangeInclusive;
 use std::time::Duration;
-use zerocopy::FromBytes;
 
 const PLAYING_STATES: [u32; 3] = [0, 4, 5];
 const SPLITS: [(Event, RangeInclusive<u32>); 8] = [
@@ -26,7 +27,7 @@ const SPLITS: [(Event, RangeInclusive<u32>); 8] = [
 
 #[derive(Debug)]
 pub(crate) struct Game {
-    handle: imp::Handle,
+    handle: DebugIgnore<imp::Handle>,
     old: State,
     cur: State,
 }
@@ -73,7 +74,7 @@ impl Game {
         let handle = imp::find_game_object(pid)?;
         log::info!("attached to pid {}", pid);
         Ok(Game {
-            handle,
+            handle: DebugIgnore(handle),
             old: State::new(),
             cur: State::new(),
         })
@@ -144,28 +145,5 @@ impl Game {
         };
 
         Ok(Update { time, event })
-    }
-}
-
-#[derive(Debug, FromBytes)]
-struct Timer<T> {
-    frames: T,
-    seconds: T,
-    minutes: T,
-    hours: T,
-}
-
-impl<T> From<Timer<T>> for Duration
-where
-    u64: From<T>,
-    u32: From<T>,
-{
-    fn from(timer: Timer<T>) -> Duration {
-        Duration::new(
-            u64::from(timer.hours) * 3600
-                + u64::from(timer.minutes) * 60
-                + u64::from(timer.seconds),
-            1_000_000_000u32 / 30 * u32::from(timer.frames),
-        )
     }
 }

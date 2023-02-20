@@ -1,33 +1,16 @@
 #![cfg(target_os = "macos")]
 
+use crate::game::common::{GameObject, GAME_OBJECT_SIZE};
 use crate::game::State;
 use anyhow::{anyhow, Result};
-use debug_ignore::DebugIgnore;
 use read_process_memory::{CopyAddress, Pid, ProcessHandle};
 use regex::bytes::Regex;
 use std::time::Duration;
-use zerocopy::FromBytes;
 
-#[derive(Debug)]
 pub(super) struct Handle {
-    process: DebugIgnore<ProcessHandle>,
+    process: ProcessHandle,
     addr: usize,
 }
-
-#[derive(Debug, FromBytes)]
-#[repr(C)]
-struct GameObject {
-    _unused1: [u8; 0x18],     // 0x00
-    room_x: u32,              // 0x18
-    room_y: u32,              // 0x1c
-    _unused2: [u8; 0x3c],     // 0x20
-    state: u32,               // 0x5c
-    _unused3: [u8; 0x08],     // 0x60
-    gamestate: u32,           // 0x68
-    _unused4: [u8; 0x38],     // 0x6c
-    timer: super::Timer<u32>, // 0xa4
-}
-const _: () = assert!(std::mem::size_of::<GameObject>() == 0xa4 + 16);
 
 const OFFSET_GAMETIME: usize = 0xb8;
 
@@ -71,7 +54,7 @@ pub(super) fn find_game_object(pid: Pid) -> Result<Handle> {
                 // just want the start of the word where "00:00" showed up.
                 let start = m.start() - (m.start() % 8);
                 return Ok(Handle {
-                    process: DebugIgnore(handle),
+                    process: handle,
                     addr: address + start - OFFSET_GAMETIME,
                 });
             }
@@ -82,16 +65,7 @@ pub(super) fn find_game_object(pid: Pid) -> Result<Handle> {
 }
 
 pub(super) fn read_game_object(handle: &Handle) -> Result<(State, Duration)> {
-    let mut buf = [0; std::mem::size_of::<GameObject>()];
+    let mut buf = [0; GAME_OBJECT_SIZE];
     handle.process.copy_address(handle.addr, &mut buf)?;
-    let game: GameObject = zerocopy::transmute!(buf);
-    log::trace!("{:?}", game);
-    Ok((
-        State {
-            room: (game.room_x, game.room_y),
-            gamestate: game.gamestate,
-            state: game.state,
-        },
-        game.timer.into(),
-    ))
+    Ok(GameObject::from(buf).into_state())
 }
