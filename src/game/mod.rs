@@ -7,8 +7,7 @@ use linux as imp;
 use macos as imp;
 
 use anyhow::Result;
-use debug_ignore::DebugIgnore;
-use read_process_memory::{Pid, ProcessHandle};
+use read_process_memory::Pid;
 use std::ops::RangeInclusive;
 use std::time::Duration;
 use zerocopy::FromBytes;
@@ -27,8 +26,7 @@ const SPLITS: [(Event, RangeInclusive<u32>); 8] = [
 
 #[derive(Debug)]
 pub(crate) struct Game {
-    handle: DebugIgnore<ProcessHandle>,
-    game_object_addr: usize,
+    handle: imp::Handle,
     old: State,
     cur: State,
 }
@@ -72,18 +70,17 @@ pub(crate) enum Event {
 
 impl Game {
     pub(crate) fn attach(pid: Pid) -> Result<Game> {
-        let (handle, game_object_addr) = imp::find_game_object(pid)?;
+        let handle = imp::find_game_object(pid)?;
         log::info!("attached to pid {}", pid);
         Ok(Game {
-            handle: DebugIgnore(handle),
-            game_object_addr,
+            handle,
             old: State::new(),
             cur: State::new(),
         })
     }
 
     pub(crate) fn update(&mut self) -> Result<Update> {
-        let (state, time) = imp::read_game_object(&self.handle, self.game_object_addr)?;
+        let (state, time) = imp::read_game_object(&self.handle)?;
         if self.old.state == u32::MAX {
             self.old = state.clone();
             self.cur = state;

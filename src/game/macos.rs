@@ -2,10 +2,17 @@
 
 use crate::game::State;
 use anyhow::{anyhow, Result};
+use debug_ignore::DebugIgnore;
 use read_process_memory::{CopyAddress, Pid, ProcessHandle};
 use regex::bytes::Regex;
 use std::time::Duration;
 use zerocopy::FromBytes;
+
+#[derive(Debug)]
+pub(super) struct Handle {
+    process: DebugIgnore<ProcessHandle>,
+    addr: usize,
+}
 
 #[derive(Debug, FromBytes)]
 #[repr(C)]
@@ -41,7 +48,7 @@ const OFFSET_GAMETIME: usize = 0xb8;
 ///
 /// [init]: https://github.com/TerryCavanagh/VVVVVV/blob/abe3eb607711909aeb6941a471225867a94510d0/desktop_version/src/Game.cpp#L227
 /// [sso]: https://joellaity.com/2020/01/31/string.html
-pub(super) fn find_game_object(pid: Pid) -> Result<(ProcessHandle, usize)> {
+pub(super) fn find_game_object(pid: Pid) -> Result<Handle> {
     let handle = ProcessHandle::try_from(pid).map_err(|_| {
         // The `std::io::Error` returned here is useless, because the read-process-memory crate
         // assumes errno is being set. That's not how this platform works!
@@ -63,7 +70,10 @@ pub(super) fn find_game_object(pid: Pid) -> Result<(ProcessHandle, usize)> {
                 // and aarch64; on the former, the first byte contains the is_long bit. We
                 // just want the start of the word where "00:00" showed up.
                 let start = m.start() - (m.start() % 8);
-                return Ok((handle, address + start - OFFSET_GAMETIME));
+                return Ok(Handle {
+                    process: DebugIgnore(handle),
+                    addr: address + start - OFFSET_GAMETIME,
+                });
             }
         }
     }
@@ -71,9 +81,9 @@ pub(super) fn find_game_object(pid: Pid) -> Result<(ProcessHandle, usize)> {
     Err(anyhow!("failed to find game object"))
 }
 
-pub(super) fn read_game_object(handle: &ProcessHandle, addr: usize) -> Result<(State, Duration)> {
+pub(super) fn read_game_object(handle: &Handle) -> Result<(State, Duration)> {
     let mut buf = [0; std::mem::size_of::<GameObject>()];
-    handle.copy_address(addr, &mut buf)?;
+    handle.process.copy_address(handle.addr, &mut buf)?;
     let game: GameObject = zerocopy::transmute!(buf);
     log::trace!("{:?}", game);
     Ok((
