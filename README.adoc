@@ -6,6 +6,6 @@ More notes here soon when it's done.
 
 ## Thanks / See also
 
-- @tzann and @Stephen1704 for https://github.com/tzann/Autosplitters/blob/672dd98fcfc7d071987e4d06d5feca2a65e44b1a/LiveSplit.VVVVVV.asl[LiveSplit.VVVVVV.asl]
+- https://github.com/tzann[@tzann] and https://github.com/Stephen1704[@Stephen1704] for https://github.com/tzann/Autosplitters/blob/672dd98fcfc7d071987e4d06d5feca2a65e44b1a/LiveSplit.VVVVVV.asl[LiveSplit.VVVVVV.asl]
 - https://github.com/christofsteel/pyautosplit[pyautosplit], which sadly doesn't work on macOS because macOS's ptrace is not good
 - https://docs.rs/read-process-memory[read-process-memory]
