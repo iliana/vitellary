@@ -3,13 +3,17 @@
 
 mod game;
 
-use crate::game::Game;
+use crate::game::{Game, Update};
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use env_logger::Env;
+use game::Event;
 use read_process_memory::Pid;
 use std::io::BufRead;
+use std::net::{SocketAddr, TcpListener};
 use std::process::Command;
+use std::time::Duration;
+use tungstenite::Message;
 
 #[allow(clippy::doc_markdown)] // lol
 #[derive(FromArgs)]
@@ -18,6 +22,10 @@ struct Args {
     /// enable verbose logging output
     #[argh(switch, short = 'v')]
     verbose: bool,
+
+    /// bind address for WebSocket (default: 127.0.0.1:5555)
+    #[argh(option)]
+    bind: Option<SocketAddr>,
 
     /// process ID of a specific VVVVVV process
     #[argh(positional)]
@@ -56,10 +64,48 @@ fn main() -> Result<()> {
     };
 
     let mut game = Game::attach(pid)?;
-    loop {
-        let update = game.update()?;
-        if update.event.is_some() {
-            println!("{:?}", update);
+    let (sender, receiver) = crossbeam_channel::bounded::<Update>(10);
+
+    let bind = args.bind.unwrap_or_else(|| ([127, 0, 0, 1], 5555).into());
+    let server = TcpListener::bind(bind).context("failed to bind WebSocket address")?;
+    log::info!("listening on ws://{}", bind);
+    std::thread::spawn(move || {
+        let receiver = receiver;
+        for stream in server.incoming() {
+            let receiver = receiver.clone();
+            std::thread::spawn(move || -> Result<()> {
+                let mut websocket = tungstenite::accept(stream.unwrap())?;
+                loop {
+                    let update = receiver.recv()?;
+                    websocket.write_message(Message::Text(format!(
+                        "setgametime {}.{:09}",
+                        update.time.as_secs(),
+                        update.time.subsec_nanos()
+                    )))?;
+                    if let Some(event) = update.event {
+                        websocket.write_message(Message::Text(
+                            match event {
+                                Event::NewGame => "start",
+                                Event::Verdigris
+                                | Event::Vermilion
+                                | Event::Victoria
+                                | Event::Violet
+                                | Event::Vitellary
+                                | Event::IntermissionOne
+                                | Event::IntermissionTwo
+                                | Event::GameComplete => "split",
+                                Event::Reset => "reset",
+                            }
+                            .into(),
+                        ))?;
+                    }
+                }
+            });
         }
+    });
+
+    loop {
+        sender.try_send(game.update()?).ok();
+        std::thread::sleep(Duration::from_millis(10));
     }
 }
