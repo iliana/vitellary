@@ -5,8 +5,11 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = { version = "1.0.69", features = ["backtrace"] }
+anyhow = "1.0.69"
 argh = "0.1.10"
+debug-ignore = "1.0.5"
+env_logger = { version = "0.10.0", default-features = false, features = ["auto-color"] }
+log = "0.4.17"
 read-process-memory = "0.1.5"
 regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
 zerocopy = "0.6.1"

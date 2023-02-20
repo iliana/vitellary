@@ -6,13 +6,18 @@ mod game;
 use crate::game::{Game, Pid};
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
+use env_logger::Env;
 use std::io::BufRead;
 use std::process::Command;
 
 #[allow(clippy::doc_markdown)] // lol
 #[derive(FromArgs)]
-/// Attach to a VVVVVV process and provide a LiveSplit server.
+/// Attach to a VVVVVV process and provide a LiveSplit One server.
 struct Args {
+    /// enable verbose logging output
+    #[argh(switch, short = 'v')]
+    verbose: bool,
+
     /// process ID of a specific VVVVVV process
     #[argh(positional)]
     pid: Option<Pid>,
@@ -20,6 +25,13 @@ struct Args {
 
 fn main() -> Result<()> {
     let args: Args = argh::from_env();
+    env_logger::Builder::from_env(Env::default().default_filter_or(if args.verbose {
+        "vitellary=debug"
+    } else {
+        "vitellary=info"
+    }))
+    .init();
+
     let pid = if let Some(pid) = args.pid {
         pid
     } else {
@@ -42,7 +54,11 @@ fn main() -> Result<()> {
         }
     };
 
-    let game = Game::attach(pid)?;
-    println!("{:?}", game);
-    Ok(())
+    let mut game = Game::attach(pid)?;
+    loop {
+        let update = game.update()?;
+        if update.event.is_some() {
+            println!("{:?}", update);
+        }
+    }
 }
