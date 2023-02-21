@@ -78,9 +78,9 @@ fn main() -> Result<()> {
                 loop {
                     let update = receiver.recv()?;
                     websocket.write_message(Message::Text(format!(
-                        "setgametime {}.{:09}",
+                        "setgametime {}.{:02}",
                         update.time.as_secs(),
-                        update.time.subsec_nanos()
+                        update.time.subsec_nanos() / 10_000_000
                     )))?;
                     if let Some(event) = update.event {
                         websocket.write_message(Message::Text(
